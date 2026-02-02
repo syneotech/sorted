@@ -99,8 +99,8 @@ export async function GET(request: NextRequest) {
       console.error('Zomato fetch failed:', zomatoResults.reason);
     }
 
-    // Match restaurants across platforms
-    const comparisons = matchRestaurants(swiggyRestaurants, zomatoRestaurants);
+    // Match restaurants across platforms with relevance scoring
+    const comparisons = matchRestaurants(swiggyRestaurants, zomatoRestaurants, query || undefined);
 
     // Calculate stats
     const matched = comparisons.filter((c) => c.swiggy && c.zomato).length;

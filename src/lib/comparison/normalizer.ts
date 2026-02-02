@@ -1,4 +1,5 @@
 import type { NormalizedRestaurant, NormalizedMenuItem } from '../swiggy/types';
+import type { RelevanceScore } from '../search/types';
 
 // Unified types for comparison
 export interface ComparisonRestaurant {
@@ -7,6 +8,8 @@ export interface ComparisonRestaurant {
   swiggy?: NormalizedRestaurant;
   zomato?: NormalizedRestaurant;
   matchConfidence: number;
+  /** Relevance score for search ranking */
+  relevanceScore?: RelevanceScore;
   priceDifference?: {
     swiggy: number;
     zomato: number;
