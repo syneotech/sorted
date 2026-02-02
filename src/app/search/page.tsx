@@ -1,12 +1,23 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import LocationPicker from '@/components/LocationPicker';
 import ComparisonCard from '@/components/ComparisonCard';
+import { FilterBar } from '@/components/filters';
 import type { ComparisonRestaurant } from '@/lib/comparison/normalizer';
+import type { FilterState } from '@/lib/filters/types';
+import type { SortOption } from '@/lib/sorting/types';
+import { DEFAULT_FILTER_STATE } from '@/lib/filters/types';
+import { DEFAULT_SORT } from '@/lib/sorting/types';
+import {
+  parseFiltersFromQuery,
+  parseSortFromQuery,
+  buildFilterQueryString,
+} from '@/lib/filters/engine';
+import { getUniqueCuisines } from '@/lib/filters/cuisine';
 
 interface Location {
   lat: number;
@@ -30,10 +41,16 @@ interface SearchResult {
     swiggyOnly: number;
     zomatoOnly: number;
   };
+  filtered: {
+    totalCount: number;
+    filteredCount: number;
+    appliedFilters: string[];
+  };
   cached: boolean;
 }
 
 function SearchContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [location, setLocation] = useState<Location>({
@@ -45,15 +62,22 @@ function SearchContent() {
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'matched' | 'swiggy' | 'zomato'>('all');
 
-  const performSearch = useCallback(async (searchQuery: string, loc: Location) => {
-    if (!searchQuery.trim()) return;
+  // Filter and sort state
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...DEFAULT_FILTER_STATE,
+    ...parseFiltersFromQuery(searchParams),
+  }));
+  const [sortBy, setSortBy] = useState<SortOption>(() =>
+    parseSortFromQuery(searchParams)
+  );
 
-    setLoading(true);
-    setError(null);
+  // Available cuisines from results (for filter UI)
+  const [availableCuisines, setAvailableCuisines] = useState<string[]>([]);
 
-    try {
+  // Build URL with all params
+  const buildUrl = useCallback(
+    (searchQuery: string, loc: Location, filterState: FilterState, sort: SortOption) => {
       const params = new URLSearchParams({
         q: searchQuery,
         lat: loc.lat.toString(),
@@ -61,74 +85,114 @@ function SearchContent() {
         city: loc.city,
       });
 
-      const response = await fetch(`/api/search?${params.toString()}`);
-      const data = await response.json();
+      const filterQuery = buildFilterQueryString(filterState, sort);
+      const filterParams = new URLSearchParams(filterQuery);
+      filterParams.forEach((value, key) => {
+        params.set(key, value);
+      });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Search failed');
+      return `/search?${params.toString()}`;
+    },
+    []
+  );
+
+  const performSearch = useCallback(
+    async (searchQuery: string, loc: Location, filterState: FilterState, sort: SortOption) => {
+      if (!searchQuery.trim()) return;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const params = new URLSearchParams({
+          q: searchQuery,
+          lat: loc.lat.toString(),
+          lng: loc.lng.toString(),
+          city: loc.city,
+        });
+
+        // Add filter and sort params
+        const filterQuery = buildFilterQueryString(filterState, sort);
+        const filterParams = new URLSearchParams(filterQuery);
+        filterParams.forEach((value, key) => {
+          params.set(key, value);
+        });
+
+        const response = await fetch(`/api/search?${params.toString()}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Search failed');
+        }
+
+        setResults(data);
+
+        // Extract available cuisines for filter UI
+        if (data.comparisons) {
+          const cuisines = getUniqueCuisines(data.comparisons);
+          setAvailableCuisines(cuisines);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
       }
-
-      setResults(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Initial search on mount
   useEffect(() => {
     if (query) {
-      performSearch(query, location);
+      performSearch(query, location, filters, sortBy);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = useCallback(
     (newQuery: string) => {
       setQuery(newQuery);
-      // Update URL
-      const params = new URLSearchParams({
-        q: newQuery,
-        lat: location.lat.toString(),
-        lng: location.lng.toString(),
-        city: location.city,
-      });
-      window.history.pushState({}, '', `/search?${params.toString()}`);
-      performSearch(newQuery, location);
+      const url = buildUrl(newQuery, location, filters, sortBy);
+      router.push(url);
+      performSearch(newQuery, location, filters, sortBy);
     },
-    [location, performSearch]
+    [location, filters, sortBy, buildUrl, router, performSearch]
   );
 
   const handleLocationChange = useCallback(
     (newLocation: Location) => {
       setLocation(newLocation);
       if (query) {
-        // Update URL
-        const params = new URLSearchParams({
-          q: query,
-          lat: newLocation.lat.toString(),
-          lng: newLocation.lng.toString(),
-          city: newLocation.city,
-        });
-        window.history.pushState({}, '', `/search?${params.toString()}`);
-        performSearch(query, newLocation);
+        const url = buildUrl(query, newLocation, filters, sortBy);
+        router.push(url);
+        performSearch(query, newLocation, filters, sortBy);
       }
     },
-    [query, performSearch]
+    [query, filters, sortBy, buildUrl, router, performSearch]
   );
 
-  const filteredComparisons = results?.comparisons.filter((c) => {
-    switch (filter) {
-      case 'matched':
-        return c.swiggy && c.zomato;
-      case 'swiggy':
-        return c.swiggy && !c.zomato;
-      case 'zomato':
-        return !c.swiggy && c.zomato;
-      default:
-        return true;
-    }
-  });
+  const handleFiltersChange = useCallback(
+    (newFilters: FilterState) => {
+      setFilters(newFilters);
+      if (query) {
+        const url = buildUrl(query, location, newFilters, sortBy);
+        router.replace(url, { scroll: false });
+        performSearch(query, location, newFilters, sortBy);
+      }
+    },
+    [query, location, sortBy, buildUrl, router, performSearch]
+  );
+
+  const handleSortChange = useCallback(
+    (newSort: SortOption) => {
+      setSortBy(newSort);
+      if (query) {
+        const url = buildUrl(query, location, filters, newSort);
+        router.replace(url, { scroll: false });
+        performSearch(query, location, filters, newSort);
+      }
+    },
+    [query, location, filters, buildUrl, router, performSearch]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -182,7 +246,7 @@ function SearchContent() {
             </svg>
             <p className="text-red-600 font-medium">{error}</p>
             <button
-              onClick={() => performSearch(query, location)}
+              onClick={() => performSearch(query, location, filters, sortBy)}
               className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
             >
               Try Again
@@ -224,32 +288,23 @@ function SearchContent() {
               </div>
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-              {[
-                { key: 'all', label: 'All', count: results.comparisons.length },
-                { key: 'matched', label: 'Matched', count: results.stats.matched },
-                { key: 'swiggy', label: 'Swiggy Only', count: results.stats.swiggyOnly },
-                { key: 'zomato', label: 'Zomato Only', count: results.stats.zomatoOnly },
-              ].map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key as typeof filter)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                    filter === key
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {label} ({count})
-                </button>
-              ))}
+            {/* Filter Bar */}
+            <div className="mb-6">
+              <FilterBar
+                filters={filters}
+                sortBy={sortBy}
+                onFiltersChange={handleFiltersChange}
+                onSortChange={handleSortChange}
+                availableCuisines={availableCuisines}
+                resultCount={results.filtered?.filteredCount ?? results.comparisons.length}
+                totalCount={results.filtered?.totalCount ?? results.comparisons.length}
+              />
             </div>
 
             {/* Restaurant Grid */}
-            {filteredComparisons && filteredComparisons.length > 0 ? (
+            {results.comparisons && results.comparisons.length > 0 ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredComparisons.map((comparison) => (
+                {results.comparisons.map((comparison) => (
                   <ComparisonCard
                     key={comparison.matchId}
                     comparison={comparison}
@@ -274,7 +329,19 @@ function SearchContent() {
                     d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <p className="text-gray-500">No restaurants found matching this filter</p>
+                <p className="text-gray-500">No restaurants found matching your filters</p>
+                <button
+                  onClick={() => {
+                    setFilters(DEFAULT_FILTER_STATE);
+                    setSortBy(DEFAULT_SORT);
+                    if (query) {
+                      performSearch(query, location, DEFAULT_FILTER_STATE, DEFAULT_SORT);
+                    }
+                  }}
+                  className="mt-4 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                >
+                  Clear all filters
+                </button>
               </div>
             )}
           </>
