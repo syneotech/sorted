@@ -11,6 +11,11 @@ import {
   setInCache,
   CACHE_TTL,
 } from '@/lib/cache/redis';
+import {
+  processSearchResults,
+  parseFiltersFromQuery,
+  parseSortFromQuery,
+} from '@/lib/filters';
 import type { NormalizedRestaurant } from '@/lib/swiggy/types';
 import type { ComparisonRestaurant } from '@/lib/comparison/normalizer';
 
@@ -28,6 +33,11 @@ interface UnifiedSearchResult {
     matched: number;
     swiggyOnly: number;
     zomatoOnly: number;
+  };
+  filtered: {
+    totalCount: number;
+    filteredCount: number;
+    appliedFilters: string[];
   };
   cached: boolean;
 }
@@ -73,9 +83,22 @@ export async function GET(request: NextRequest) {
     const cached = await getFromCache<UnifiedSearchResult>(cacheKey);
 
     if (cached) {
+      // Parse filter and sort parameters for cached results too
+      const filters = parseFiltersFromQuery(searchParams);
+      const sortBy = parseSortFromQuery(searchParams);
+
+      // Apply filters and sorting to cached results
+      const processed = processSearchResults(cached.comparisons, { filters, sortBy });
+
       return NextResponse.json({
         success: true,
         ...cached,
+        comparisons: processed.restaurants,
+        filtered: {
+          totalCount: processed.totalCount,
+          filteredCount: processed.filteredCount,
+          appliedFilters: processed.appliedFilters,
+        },
         cached: true,
       });
     }
@@ -102,7 +125,14 @@ export async function GET(request: NextRequest) {
     // Match restaurants across platforms with relevance scoring
     const comparisons = matchRestaurants(swiggyRestaurants, zomatoRestaurants, query || undefined);
 
-    // Calculate stats
+    // Parse filter and sort parameters
+    const filters = parseFiltersFromQuery(searchParams);
+    const sortBy = parseSortFromQuery(searchParams);
+
+    // Apply filters and sorting
+    const processed = processSearchResults(comparisons, { filters, sortBy });
+
+    // Calculate stats (before filtering)
     const matched = comparisons.filter((c) => c.swiggy && c.zomato).length;
     const swiggyOnly = comparisons.filter((c) => c.swiggy && !c.zomato).length;
     const zomatoOnly = comparisons.filter((c) => !c.swiggy && c.zomato).length;
@@ -110,13 +140,18 @@ export async function GET(request: NextRequest) {
     const result: UnifiedSearchResult = {
       query,
       location: { lat, lng, city },
-      comparisons,
+      comparisons: processed.restaurants,
       stats: {
         totalSwiggy: swiggyRestaurants.length,
         totalZomato: zomatoRestaurants.length,
         matched,
         swiggyOnly,
         zomatoOnly,
+      },
+      filtered: {
+        totalCount: processed.totalCount,
+        filteredCount: processed.filteredCount,
+        appliedFilters: processed.appliedFilters,
       },
       cached: false,
     };
