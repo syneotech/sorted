@@ -8,8 +8,8 @@ This document tracks the progress of the Sorted app enhancement plan.
 |-------|--------|----------|--------|
 | Phase 1: Documentation & Architecture | Completed | 100% | `feature/phase-1-documentation` |
 | Phase 2: Search Relevance Algorithm | Completed | 100% | `feature/phase-2-relevance-algorithm` |
-| Phase 3: Filters & Sorting | In Progress | 90% | `feature/phase-3-filters-sorting` |
-| Phase 4: UI/UX Redesign | Not Started | 0% | `feature/phase-4-ui-redesign` |
+| Phase 3: Filters & Sorting | Completed | 100% | `feature/phase-3-filters-sorting` |
+| Phase 4: UI/UX Redesign | Completed | 100% | `feature/phase-4-ui-redesign` |
 | Phase 5: Testing & Polish | Not Started | 0% | `feature/phase-5-testing-polish` |
 
 ---
@@ -221,11 +221,92 @@ This document tracks the progress of the Sorted app enhancement plan.
 
 ## Phase 4: UI/UX Redesign
 
-**Status**: Not Started
+**Status**: Completed
 **Branch**: `feature/phase-4-ui-redesign`
+**Merged to**: -
 
-### Pending Tasks
-(See full plan in main PLAN document)
+### Completed Tasks
+
+#### Sub-Phase 4.1: Skeleton Loading Components
+- [x] 4.1.1 Create base Skeleton component with shimmer animation
+- [x] 4.1.2 Create SkeletonCard for restaurant card loading
+- [x] 4.1.3 Create LoadingProgress for platform status indicators
+- [x] 4.1.4 Create SkeletonMenuItem for menu page loading
+- [x] 4.1.5 Update search page to use skeleton grid
+- [x] 4.1.6 Update restaurant page to use skeleton menu list
+
+#### Sub-Phase 4.2: Platform-Specific Error Handling
+- [x] 4.2.1 Add platformStatus to API response
+- [x] 4.2.2 Create PartialResultsBanner component
+- [x] 4.2.3 Create TotalFailureBanner component
+- [x] 4.2.4 Update search page to handle partial results
+- [x] 4.2.5 Add retry functionality per platform
+
+#### Sub-Phase 4.3: Enhanced Empty States
+- [x] 4.3.1 Create popular searches list
+- [x] 4.3.2 Create EmptyState reusable component
+- [x] 4.3.3 Create SearchSuggestions component with clickable chips
+- [x] 4.3.4 Create preset empty states (Initial, NoResults, NoFiltered)
+- [x] 4.3.5 Update search page with contextual empty states
+
+#### Sub-Phase 4.4: Mobile Responsiveness
+- [x] 4.4.1 Create useMediaQuery hook with useSyncExternalStore
+- [x] 4.4.2 Create MobileFilterDrawer bottom sheet
+- [x] 4.4.3 Update FilterBar for mobile (drawer trigger)
+- [x] 4.4.4 Update grid to responsive columns (1/2/3)
+- [x] 4.4.5 Increase touch targets to 44px minimum
+- [x] 4.4.6 Update MenuComparison with mobile optimizations
+
+#### Sub-Phase 4.5: Enhanced Visual Hierarchy for Savings
+- [x] 4.5.1 Create SavingsBadge component with percentage
+- [x] 4.5.2 Create calculateSavings utility function
+- [x] 4.5.3 Add prominent savings badge to ComparisonCard
+- [x] 4.5.4 Add green highlight border for cards with >20% savings
+- [x] 4.5.5 Add row highlighting for menu items with savings
+
+#### Sub-Phase 4.6: Accessibility Improvements
+- [x] 4.6.1 Enhanced focus-visible styles in globals.css
+- [x] 4.6.2 Add role="checkbox" and aria-checked to FilterChip
+- [x] 4.6.3 Add aria-live region for results announcement
+- [x] 4.6.4 Add aria-labels to icon-only buttons
+- [x] 4.6.5 Add sr-only class for screen reader text
+- [x] 4.6.6 Add reduced-motion media query support
+
+### Files Created
+- `src/lib/utils.ts` - cn() utility function
+- `src/lib/search/popular.ts` - Popular search terms
+- `src/components/ui/Skeleton.tsx` - Base skeleton components
+- `src/components/SkeletonCard.tsx` - Restaurant card skeleton
+- `src/components/SkeletonMenuItem.tsx` - Menu item skeleton
+- `src/components/LoadingProgress.tsx` - Platform loading status
+- `src/components/PartialResultsBanner.tsx` - Partial results warning
+- `src/components/EmptyState.tsx` - Reusable empty states
+- `src/components/SearchSuggestions.tsx` - Popular search chips
+- `src/components/MobileFilterDrawer.tsx` - Mobile filter bottom sheet
+- `src/components/SavingsBadge.tsx` - Savings display component
+- `src/hooks/useMediaQuery.ts` - Responsive breakpoint hook
+
+### Files Modified
+- `src/app/globals.css` - Enhanced focus, sr-only, reduced motion
+- `src/app/search/page.tsx` - Skeleton, empty states, partial results
+- `src/app/restaurant/[slug]/page.tsx` - Skeleton loading
+- `src/app/api/search/route.ts` - Platform status in response
+- `src/components/ComparisonCard.tsx` - Savings badge, responsive
+- `src/components/MenuComparison.tsx` - Mobile optimizations, savings
+- `src/components/PriceBadge.tsx` - Enhanced display
+- `src/components/filters/FilterBar.tsx` - Mobile drawer integration
+- `src/components/filters/FilterChip.tsx` - Touch targets, ARIA
+
+### Key Features Implemented
+- Skeleton loading with shimmer animation matching card layouts
+- Platform-specific error handling with retry functionality
+- Contextual empty states with popular search suggestions
+- Bottom sheet filter drawer for mobile
+- 44px minimum touch targets for mobile
+- Prominent savings badges with percentage display
+- Green highlight border for high-savings cards
+- Screen reader announcements for search results
+- Reduced motion support for accessibility
 
 ---
 
@@ -246,7 +327,8 @@ This document tracks the progress of the Sorted app enhancement plan.
 | c172ff5 | feat: complete MVP implementation | Pre-enhancement |
 | d891e59 | docs: add comprehensive documentation and architecture diagrams | Phase 1 |
 | f05335e | feat: implement cuisine-aware relevance scoring | Phase 2 |
-| (pending) | feat: implement filters and sorting | Phase 3 |
+| 3723ad1 | feat: implement filters and sorting for search results | Phase 3 |
+| (pending) | feat: implement UI/UX redesign with loading states and mobile responsiveness | Phase 4 |
 
 ---
 
@@ -254,6 +336,7 @@ This document tracks the progress of the Sorted app enhancement plan.
 
 - Phase 2 test files are prepared but commented out - will be enabled in Phase 5
 - Phase 3 implementation is functional, pending visual testing and unit tests
+- Phase 4 UI/UX improvements address issues #4-8 from UX_ISSUES.md
 - Visual verification tasks require running the app locally
 - All merges to develop use `--no-ff` for clear history
 
