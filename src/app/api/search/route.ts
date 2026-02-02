@@ -19,6 +19,12 @@ import {
 import type { NormalizedRestaurant } from '@/lib/swiggy/types';
 import type { ComparisonRestaurant } from '@/lib/comparison/normalizer';
 
+interface PlatformStatus {
+  success: boolean;
+  error?: string;
+  count: number;
+}
+
 interface UnifiedSearchResult {
   query: string;
   location: {
@@ -38,6 +44,10 @@ interface UnifiedSearchResult {
     totalCount: number;
     filteredCount: number;
     appliedFilters: string[];
+  };
+  platformStatus: {
+    swiggy: PlatformStatus;
+    zomato: PlatformStatus;
   };
   cached: boolean;
 }
@@ -114,12 +124,20 @@ export async function GET(request: NextRequest) {
     const zomatoRestaurants: NormalizedRestaurant[] =
       zomatoResults.status === 'fulfilled' ? zomatoResults.value : [];
 
+    // Track platform status
+    const swiggyError = swiggyResults.status === 'rejected'
+      ? (swiggyResults.reason instanceof Error ? swiggyResults.reason.message : 'Unknown error')
+      : undefined;
+    const zomatoError = zomatoResults.status === 'rejected'
+      ? (zomatoResults.reason instanceof Error ? zomatoResults.reason.message : 'Unknown error')
+      : undefined;
+
     // Log any errors
-    if (swiggyResults.status === 'rejected') {
-      console.error('Swiggy fetch failed:', swiggyResults.reason);
+    if (swiggyError) {
+      console.error('Swiggy fetch failed:', swiggyError);
     }
-    if (zomatoResults.status === 'rejected') {
-      console.error('Zomato fetch failed:', zomatoResults.reason);
+    if (zomatoError) {
+      console.error('Zomato fetch failed:', zomatoError);
     }
 
     // Match restaurants across platforms with relevance scoring
@@ -152,6 +170,18 @@ export async function GET(request: NextRequest) {
         totalCount: processed.totalCount,
         filteredCount: processed.filteredCount,
         appliedFilters: processed.appliedFilters,
+      },
+      platformStatus: {
+        swiggy: {
+          success: !swiggyError,
+          error: swiggyError,
+          count: swiggyRestaurants.length,
+        },
+        zomato: {
+          success: !zomatoError,
+          error: zomatoError,
+          count: zomatoRestaurants.length,
+        },
       },
       cached: false,
     };
