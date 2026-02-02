@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useParams } from 'next/navigation';
 import Link from 'next/link';
 import MenuComparison from '@/components/MenuComparison';
+import Skeleton from '@/components/ui/Skeleton';
+import { SkeletonMenuList } from '@/components/SkeletonMenuItem';
 import type { ComparisonMenuItem } from '@/lib/comparison/normalizer';
 
 interface MenuComparisonResult {
@@ -156,10 +158,29 @@ function RestaurantContent() {
 
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-4" />
-            <p className="text-gray-600">Loading menu comparison...</p>
-            <p className="text-sm text-gray-400 mt-1">Fetching menus from both platforms</p>
+          <div className="space-y-6">
+            {/* Pricing summary skeleton */}
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-6 border border-orange-100">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
+                    <Skeleton className="h-4 w-20 mb-2" />
+                    <Skeleton className="h-8 w-24" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter bar skeleton */}
+            <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-lg shadow-sm">
+              <Skeleton className="h-9 w-40" />
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-6 w-24" />
+            </div>
+
+            {/* Menu items skeleton */}
+            <SkeletonMenuList categoryCount={3} />
           </div>
         )}
 

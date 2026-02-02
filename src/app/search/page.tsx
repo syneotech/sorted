@@ -7,6 +7,11 @@ import SearchBar from '@/components/SearchBar';
 import LocationPicker from '@/components/LocationPicker';
 import ComparisonCard from '@/components/ComparisonCard';
 import { FilterBar } from '@/components/filters';
+import { SkeletonCardGrid } from '@/components/SkeletonCard';
+import LoadingProgress from '@/components/LoadingProgress';
+import PartialResultsBanner, { TotalFailureBanner } from '@/components/PartialResultsBanner';
+import { InitialSearchEmpty, NoFilteredResultsEmpty } from '@/components/EmptyState';
+import SearchSuggestions from '@/components/SearchSuggestions';
 import type { ComparisonRestaurant } from '@/lib/comparison/normalizer';
 import type { FilterState } from '@/lib/filters/types';
 import type { SortOption } from '@/lib/sorting/types';
@@ -24,6 +29,12 @@ interface Location {
   lng: number;
   city: string;
   address?: string;
+}
+
+interface PlatformStatus {
+  success: boolean;
+  error?: string;
+  count: number;
 }
 
 interface SearchResult {
@@ -45,6 +56,10 @@ interface SearchResult {
     totalCount: number;
     filteredCount: number;
     appliedFilters: string[];
+  };
+  platformStatus?: {
+    swiggy: PlatformStatus;
+    zomato: PlatformStatus;
   };
   cached: boolean;
 }
@@ -194,6 +209,28 @@ function SearchContent() {
     [query, location, filters, buildUrl, router, performSearch]
   );
 
+  // Handler for retrying a single platform
+  const handlePlatformRetry = useCallback(
+    (_platform: 'swiggy' | 'zomato') => {
+      // For now, just retry the full search
+      // In a more advanced implementation, you could retry only the failed platform
+      if (query) {
+        performSearch(query, location, filters, sortBy);
+      }
+    },
+    [query, location, filters, sortBy, performSearch]
+  );
+
+  // Check if we have total failure (both platforms failed)
+  const hasTotalFailure = results?.platformStatus &&
+    !results.platformStatus.swiggy.success &&
+    !results.platformStatus.zomato.success;
+
+  // Check if we have partial results
+  const hasPartialResults = results?.platformStatus &&
+    ((results.platformStatus.swiggy.success && !results.platformStatus.zomato.success) ||
+    (!results.platformStatus.swiggy.success && results.platformStatus.zomato.success));
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -218,13 +255,25 @@ function SearchContent() {
       </header>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8" role="main">
+        {/* Screen reader announcement for results */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {loading && 'Searching restaurants...'}
+          {results && !loading && (
+            `Showing ${results.filtered?.filteredCount ?? results.comparisons.length} restaurants`
+          )}
+          {error && !loading && `Error: ${error}`}
+        </div>
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-4" />
-            <p className="text-gray-600">Searching Swiggy & Zomato...</p>
-            <p className="text-sm text-gray-400 mt-1">This may take a few seconds</p>
+          <div className="space-y-8">
+            {/* Loading progress indicator */}
+            <div className="py-8">
+              <LoadingProgress />
+            </div>
+
+            {/* Skeleton cards */}
+            <SkeletonCardGrid count={6} />
           </div>
         )}
 
@@ -254,9 +303,22 @@ function SearchContent() {
           </div>
         )}
 
+        {/* Total Failure State */}
+        {results && !loading && hasTotalFailure && (
+          <TotalFailureBanner onRetry={() => performSearch(query, location, filters, sortBy)} />
+        )}
+
         {/* Results */}
-        {results && !loading && (
+        {results && !loading && !hasTotalFailure && (
           <>
+            {/* Partial Results Banner */}
+            {hasPartialResults && results.platformStatus && (
+              <PartialResultsBanner
+                platformStatus={results.platformStatus}
+                onRetry={handlePlatformRetry}
+              />
+            )}
+
             {/* Stats Bar */}
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -303,7 +365,7 @@ function SearchContent() {
 
             {/* Restaurant Grid */}
             {results.comparisons && results.comparisons.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {results.comparisons.map((comparison) => (
                   <ComparisonCard
                     key={comparison.matchId}
@@ -315,56 +377,26 @@ function SearchContent() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <svg
-                  className="w-16 h-16 text-gray-300 mx-auto mb-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <p className="text-gray-500">No restaurants found matching your filters</p>
-                <button
-                  onClick={() => {
-                    setFilters(DEFAULT_FILTER_STATE);
-                    setSortBy(DEFAULT_SORT);
-                    if (query) {
-                      performSearch(query, location, DEFAULT_FILTER_STATE, DEFAULT_SORT);
-                    }
-                  }}
-                  className="mt-4 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
-                >
-                  Clear all filters
-                </button>
-              </div>
+              <NoFilteredResultsEmpty
+                onClearFilters={() => {
+                  setFilters(DEFAULT_FILTER_STATE);
+                  setSortBy(DEFAULT_SORT);
+                  if (query) {
+                    performSearch(query, location, DEFAULT_FILTER_STATE, DEFAULT_SORT);
+                  }
+                }}
+              >
+                <SearchSuggestions onSelect={handleSearch} />
+              </NoFilteredResultsEmpty>
             )}
           </>
         )}
 
         {/* Empty State */}
         {!loading && !error && !results && (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <svg
-              className="w-16 h-16 text-gray-300 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <p className="text-gray-500">Search for restaurants or dishes to compare prices</p>
-          </div>
+          <InitialSearchEmpty>
+            <SearchSuggestions onSelect={handleSearch} />
+          </InitialSearchEmpty>
         )}
       </main>
     </div>
