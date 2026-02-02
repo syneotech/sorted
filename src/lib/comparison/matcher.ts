@@ -8,6 +8,12 @@ import {
   type ComparisonRestaurant,
   type ComparisonMenuItem,
 } from './normalizer';
+import {
+  calculateRelevanceScore,
+  analyzeQuery,
+  type SearchContext,
+  type RelevanceScore,
+} from '../search';
 
 // Fuse.js configuration for fuzzy matching
 const RESTAURANT_FUSE_OPTIONS: IFuseOptions<NormalizedRestaurant> = {
@@ -34,8 +40,11 @@ const MENU_ITEM_FUSE_OPTIONS: IFuseOptions<NormalizedMenuItem> = {
 // Match restaurants between Swiggy and Zomato
 export function matchRestaurants(
   swiggyRestaurants: NormalizedRestaurant[],
-  zomatoRestaurants: NormalizedRestaurant[]
+  zomatoRestaurants: NormalizedRestaurant[],
+  query?: string
 ): ComparisonRestaurant[] {
+  // Analyze query for relevance scoring
+  const searchContext = query ? analyzeQuery(query) : null;
   const results: ComparisonRestaurant[] = [];
   const matchedZomatoIds = new Set<string>();
 
@@ -84,12 +93,27 @@ export function matchRestaurants(
 
     const comparison = calculateRestaurantComparison(swiggyRestaurant, matchedZomato);
 
+    // Calculate relevance score if we have a search context
+    let relevanceScore: RelevanceScore | undefined;
+    if (searchContext) {
+      // Use the primary restaurant data for relevance scoring
+      // Prefer Swiggy data, but use Zomato if matched
+      const primaryRestaurant = swiggyRestaurant;
+      relevanceScore = calculateRelevanceScore(primaryRestaurant, searchContext);
+
+      // Boost relevance if matched on both platforms (more trustworthy result)
+      if (matchedZomato) {
+        relevanceScore.total = Math.min(100, Math.round(relevanceScore.total * 1.1));
+      }
+    }
+
     results.push({
       matchId: `match_${swiggyRestaurant.platformId}_${matchedZomato?.platformId || 'none'}`,
       name: swiggyRestaurant.name,
       swiggy: swiggyRestaurant,
       zomato: matchedZomato,
       matchConfidence,
+      relevanceScore,
       ...comparison,
     });
   }
@@ -97,27 +121,47 @@ export function matchRestaurants(
   // Add unmatched Zomato restaurants
   for (const zomatoRestaurant of zomatoRestaurants) {
     if (!matchedZomatoIds.has(zomatoRestaurant.id)) {
+      // Calculate relevance score for Zomato-only restaurants
+      let relevanceScore: RelevanceScore | undefined;
+      if (searchContext) {
+        relevanceScore = calculateRelevanceScore(zomatoRestaurant, searchContext);
+      }
+
       results.push({
         matchId: `match_none_${zomatoRestaurant.platformId}`,
         name: zomatoRestaurant.name,
         swiggy: undefined,
         zomato: zomatoRestaurant,
         matchConfidence: 0,
+        relevanceScore,
       });
     }
   }
 
-  // Sort by match confidence (matched restaurants first), then by name
+  // Sort by relevance score (primary), then by match status, then by name
   return results.sort((a, b) => {
-    // Both matched: sort by confidence
-    if (a.swiggy && a.zomato && b.swiggy && b.zomato) {
+    // Primary sort: relevance score (if available)
+    const aRelevance = a.relevanceScore?.total ?? 0;
+    const bRelevance = b.relevanceScore?.total ?? 0;
+
+    if (aRelevance !== bRelevance) {
+      return bRelevance - aRelevance; // Higher relevance first
+    }
+
+    // Secondary sort: matched restaurants before unmatched
+    const aMatched = a.swiggy && a.zomato;
+    const bMatched = b.swiggy && b.zomato;
+
+    if (aMatched !== bMatched) {
+      return aMatched ? -1 : 1;
+    }
+
+    // Tertiary sort: match confidence
+    if (a.matchConfidence !== b.matchConfidence) {
       return b.matchConfidence - a.matchConfidence;
     }
-    // Matched before unmatched
-    if ((a.swiggy && a.zomato) || (b.swiggy && b.zomato)) {
-      return (a.swiggy && a.zomato) ? -1 : 1;
-    }
-    // Both unmatched: sort by name
+
+    // Final sort: alphabetical by name
     return a.name.localeCompare(b.name);
   });
 }
