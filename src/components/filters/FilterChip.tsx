@@ -20,8 +20,11 @@ export default function FilterChip({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      role="checkbox"
+      aria-checked={selected}
       className={`
-        px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+        px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200
+        min-h-[44px] min-w-[44px]
         ${selected
           ? 'bg-orange-500 text-white shadow-md'
           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

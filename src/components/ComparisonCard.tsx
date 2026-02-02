@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ComparisonRestaurant } from '@/lib/comparison/normalizer';
 import PriceBadge from './PriceBadge';
+import { SavingsBadgeCompact, calculateSavings } from './SavingsBadge';
 
 interface ComparisonCardProps {
   comparison: ComparisonRestaurant;
@@ -27,6 +28,12 @@ export default function ComparisonCard({
   const swiggyOnly = swiggy && !zomato;
   const zomatoOnly = !swiggy && zomato;
 
+  // Calculate savings for matched restaurants
+  const savingsInfo = isMatched
+    ? calculateSavings(swiggy?.costForTwoValue, zomato?.costForTwoValue)
+    : null;
+  const hasHighSavings = savingsInfo && savingsInfo.percentage >= 20;
+
   // Build comparison URL
   const comparisonUrl = `/restaurant/${encodeURIComponent(restaurant.name.toLowerCase().replace(/\s+/g, '-'))}?${
     swiggy ? `swiggy_id=${swiggy.platformId}` : ''
@@ -35,9 +42,13 @@ export default function ComparisonCard({
   }&lat=${lat}&lng=${lng}&city=${city}`;
 
   return (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow overflow-hidden">
+    <div
+      className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow overflow-hidden ${
+        hasHighSavings ? 'ring-2 ring-green-400 ring-offset-1' : ''
+      }`}
+    >
       {/* Image */}
-      <div className="relative h-48 bg-gray-200">
+      <div className="relative h-40 sm:h-48 bg-gray-200">
         {restaurant.imageUrl ? (
           <Image
             src={restaurant.imageUrl}
@@ -138,6 +149,17 @@ export default function ComparisonCard({
           </span>
         </div>
 
+        {/* Savings Badge - Prominent display for matched cards with savings */}
+        {isMatched && savingsInfo && savingsInfo.cheaperPlatform && (
+          <div className="mb-3">
+            <SavingsBadgeCompact
+              savings={savingsInfo.savings}
+              percentage={savingsInfo.percentage}
+              cheaperPlatform={savingsInfo.cheaperPlatform}
+            />
+          </div>
+        )}
+
         {/* Price Comparison */}
         {isMatched && (
           <div className="mb-3">
@@ -175,7 +197,7 @@ export default function ComparisonCard({
           {isMatched ? (
             <Link
               href={comparisonUrl}
-              className="flex-1 text-center px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium rounded-lg hover:from-orange-600 hover:to-red-600 transition-colors"
+              className="flex-1 text-center px-4 py-3 min-h-[44px] bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium rounded-lg hover:from-orange-600 hover:to-red-600 transition-colors flex items-center justify-center"
             >
               Compare Prices
             </Link>
@@ -186,7 +208,7 @@ export default function ComparisonCard({
                   href={swiggy.deepLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-center px-4 py-2 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                  className="flex-1 text-center px-4 py-3 min-h-[44px] bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center"
                 >
                   Order on Swiggy
                 </a>
@@ -196,7 +218,7 @@ export default function ComparisonCard({
                   href={zomato.deepLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-center px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-colors"
+                  className="flex-1 text-center px-4 py-3 min-h-[44px] bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
                 >
                   Order on Zomato
                 </a>
