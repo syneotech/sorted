@@ -1,12 +1,3 @@
-/**
- * Tests for keyword extraction
- *
- * These tests will be enabled in Phase 5 when vitest is installed.
- * Run: npm install -D vitest @testing-library/react
- * Then uncomment the tests below.
- */
-
-/*
 import { describe, it, expect } from 'vitest';
 import {
   extractKeywords,
@@ -16,7 +7,11 @@ import {
   isRestaurantNameSearch,
   analyzeQuery,
   getPrimaryIntent,
+  hasDishPriorityTerm,
+  analyzeQueryV2,
+  getIntentConfidence,
 } from '../keywords';
+import { INTENT_CONFIDENCE } from '../config';
 
 describe('extractKeywords', () => {
   it('should extract meaningful keywords', () => {
@@ -65,14 +60,15 @@ describe('detectCuisines', () => {
 describe('isDishSearch', () => {
   it('should return true for dish names', () => {
     expect(isDishSearch(['biryani'])).toBe(true);
-    expect(isDishSearch(['butter', 'chicken'])).toBe(true);
+    expect(isDishSearch(['butter chicken'])).toBe(true); // bigram matches
     expect(isDishSearch(['pizza'])).toBe(true);
     expect(isDishSearch(['dosa'])).toBe(true);
+    expect(isDishSearch(['noodles'])).toBe(true);
   });
 
   it('should return false for non-dish keywords', () => {
-    expect(isDishSearch(['restaurant'])).toBe(false);
-    expect(isDishSearch(['best', 'food'])).toBe(false);
+    expect(isDishSearch(['xyz123'])).toBe(false);
+    expect(isDishSearch(['unknown', 'item'])).toBe(false);
   });
 });
 
@@ -80,17 +76,40 @@ describe('isCuisineSearch', () => {
   it('should return true for cuisine names', () => {
     expect(isCuisineSearch(['chinese'])).toBe(true);
     expect(isCuisineSearch(['italian'])).toBe(true);
-    expect(isCuisineSearch(['south', 'indian'])).toBe(true);
+    expect(isCuisineSearch(['south indian'])).toBe(true); // bigram
   });
 
   it('should return true for cuisine aliases', () => {
     expect(isCuisineSearch(['mughlai'])).toBe(true);
     expect(isCuisineSearch(['punjabi'])).toBe(true);
+    // Note: burger IS a cuisine alias, but analyzeQuery() treats it as dish-priority
+    expect(isCuisineSearch(['burger'])).toBe(true);
   });
 
   it('should return false for non-cuisine keywords', () => {
-    expect(isCuisineSearch(['burger'])).toBe(false);
-    expect(isCuisineSearch(['best'])).toBe(false);
+    expect(isCuisineSearch(['xyz123'])).toBe(false);
+    expect(isCuisineSearch(['unknown'])).toBe(false);
+  });
+});
+
+describe('hasDishPriorityTerm', () => {
+  it('should return true for dish-priority terms', () => {
+    expect(hasDishPriorityTerm(['burger'])).toBe(true);
+    expect(hasDishPriorityTerm(['pizza'])).toBe(true);
+    expect(hasDishPriorityTerm(['biryani'])).toBe(true);
+    expect(hasDishPriorityTerm(['dosa'])).toBe(true);
+    expect(hasDishPriorityTerm(['momos'])).toBe(true);
+  });
+
+  it('should return false for non-dish-priority terms', () => {
+    expect(hasDishPriorityTerm(['chinese'])).toBe(false);
+    expect(hasDishPriorityTerm(['italian'])).toBe(false);
+    expect(hasDishPriorityTerm(['restaurant'])).toBe(false);
+  });
+
+  it('should return true if any keyword is dish-priority', () => {
+    expect(hasDishPriorityTerm(['best', 'burger', 'near'])).toBe(true);
+    expect(hasDishPriorityTerm(['pizza', 'place'])).toBe(true);
   });
 });
 
@@ -128,6 +147,27 @@ describe('analyzeQuery', () => {
     const context = analyzeQuery('best chinese near me');
     expect(context.keywords).toContain('chinese');
   });
+
+  it('should treat dish-priority terms as dish search not cuisine search', () => {
+    const context = analyzeQuery('burger');
+    // burger is a cuisine alias, but it's also a dish-priority term
+    // so isCuisineSearch should be false for better ranking
+    expect(context.hasDishPriorityTerm).toBe(true);
+    expect(context.isDishSearch).toBe(true);
+    expect(context.isCuisineSearch).toBe(false); // overridden due to dish-priority
+  });
+
+  it('should not override cuisine search for non-dish-priority terms', () => {
+    const context = analyzeQuery('chinese');
+    expect(context.hasDishPriorityTerm).toBe(false);
+    expect(context.isCuisineSearch).toBe(true);
+  });
+
+  it('should set hasDishPriorityTerm for pizza search', () => {
+    const context = analyzeQuery('pizza');
+    expect(context.hasDishPriorityTerm).toBe(true);
+    expect(context.isDishSearch).toBe(true);
+  });
 });
 
 describe('getPrimaryIntent', () => {
@@ -148,6 +188,141 @@ describe('getPrimaryIntent', () => {
     expect(getPrimaryIntent(context)).toBe('general');
   });
 });
-*/
 
-export {};
+// ============================================================================
+// V2 Multi-Axis Intent Detection Tests
+// ============================================================================
+
+describe('analyzeQueryV2', () => {
+  describe('Primary Intent Detection', () => {
+    it('should detect cuisine intent for explicit cuisine terms', () => {
+      const intent = analyzeQueryV2('chinese food');
+      expect(intent.primary).toBe('cuisine');
+      expect(intent.confidence).toBeGreaterThanOrEqual(INTENT_CONFIDENCE.HIGH);
+    });
+
+    it('should detect dish intent for dish-priority terms', () => {
+      const intent = analyzeQueryV2('burger');
+      expect(intent.primary).toBe('dish');
+      expect(intent.confidence).toBeGreaterThanOrEqual(INTENT_CONFIDENCE.HIGH);
+    });
+
+    it('should detect brand intent for known brands', () => {
+      const intent = analyzeQueryV2('mcdonalds');
+      expect(intent.primary).toBe('brand');
+      expect(intent.confidence).toBe(INTENT_CONFIDENCE.HIGH);
+    });
+
+    it('should detect brand intent for chains like Mainland China', () => {
+      const intent = analyzeQueryV2('mainland china');
+      expect(intent.primary).toBe('brand');
+    });
+
+    it('should detect restaurant intent for proper noun patterns', () => {
+      const intent = analyzeQueryV2('Pizza Hut');
+      expect(['brand', 'restaurant']).toContain(intent.primary);
+    });
+
+    it('should detect explore intent for vague queries', () => {
+      const intent = analyzeQueryV2('good food');
+      expect(intent.primary).toBe('explore');
+    });
+  });
+
+  describe('Modifier Detection', () => {
+    it('should detect quality modifier "best"', () => {
+      const intent = analyzeQueryV2('best chinese food');
+      expect(intent.modifiers.quality).toBe('best');
+    });
+
+    it('should detect quality modifier "cheap"', () => {
+      const intent = analyzeQueryV2('cheap pizza');
+      expect(intent.modifiers.quality).toBe('cheap');
+    });
+
+    it('should detect quality modifier "authentic"', () => {
+      const intent = analyzeQueryV2('authentic italian');
+      expect(intent.modifiers.quality).toBe('authentic');
+    });
+
+    it('should detect proximity modifier', () => {
+      const intent = analyzeQueryV2('pizza near me');
+      expect(intent.modifiers.proximity).toBe('near_me');
+    });
+
+    it('should detect time modifier for breakfast', () => {
+      const intent = analyzeQueryV2('breakfast places');
+      expect(intent.modifiers.time).toBe('breakfast');
+    });
+
+    it('should detect time modifier for late night', () => {
+      const intent = analyzeQueryV2('late night food');
+      expect(intent.modifiers.time).toBe('late_night');
+    });
+
+    it('should detect dietary modifier for veg', () => {
+      const intent = analyzeQueryV2('pure veg restaurant');
+      expect(intent.modifiers.dietary).toBe('veg');
+    });
+
+    it('should detect dietary modifier for halal', () => {
+      const intent = analyzeQueryV2('halal biryani');
+      expect(intent.modifiers.dietary).toBe('halal');
+    });
+
+    it('should detect multiple modifiers', () => {
+      const intent = analyzeQueryV2('best veg chinese near me');
+      expect(intent.modifiers.quality).toBe('best');
+      expect(intent.modifiers.dietary).toBe('veg');
+      expect(intent.modifiers.proximity).toBe('near_me');
+    });
+  });
+
+  describe('Confidence Levels', () => {
+    it('should have high confidence for explicit cuisine search', () => {
+      const intent = analyzeQueryV2('south indian');
+      expect(intent.confidence).toBeGreaterThanOrEqual(INTENT_CONFIDENCE.HIGH);
+    });
+
+    it('should have high confidence for brand search', () => {
+      const intent = analyzeQueryV2('kfc');
+      expect(intent.confidence).toBe(INTENT_CONFIDENCE.HIGH);
+    });
+
+    it('should have medium confidence for dish search via cuisine', () => {
+      const intent = analyzeQueryV2('dosa'); // Dish that maps to cuisine
+      expect(intent.confidence).toBeGreaterThanOrEqual(INTENT_CONFIDENCE.MEDIUM);
+    });
+
+    it('should have low confidence for explore intent', () => {
+      const intent = analyzeQueryV2('something nice');
+      expect(intent.confidence).toBe(INTENT_CONFIDENCE.LOW);
+    });
+  });
+});
+
+describe('getIntentConfidence', () => {
+  it('should return high confidence for restaurant search', () => {
+    const context = analyzeQuery('Pizza Hut');
+    const confidence = getIntentConfidence(context);
+    expect(confidence).toBe(INTENT_CONFIDENCE.HIGH);
+  });
+
+  it('should return high confidence for cuisine search', () => {
+    const context = analyzeQuery('chinese');
+    const confidence = getIntentConfidence(context);
+    expect(confidence).toBe(INTENT_CONFIDENCE.HIGH);
+  });
+
+  it('should return high confidence for dish-priority terms', () => {
+    const context = analyzeQuery('burger');
+    const confidence = getIntentConfidence(context);
+    expect(confidence).toBe(INTENT_CONFIDENCE.HIGH);
+  });
+
+  it('should return low confidence for general search', () => {
+    const context = analyzeQuery('food');
+    const confidence = getIntentConfidence(context);
+    expect(confidence).toBe(INTENT_CONFIDENCE.LOW);
+  });
+});

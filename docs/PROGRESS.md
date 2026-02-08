@@ -10,7 +10,7 @@ This document tracks the progress of the Sorted app enhancement plan.
 | Phase 2: Search Relevance Algorithm | Completed | 100% | `feature/phase-2-relevance-algorithm` |
 | Phase 3: Filters & Sorting | Completed | 100% | `feature/phase-3-filters-sorting` |
 | Phase 4: UI/UX Redesign | Completed | 100% | `feature/phase-4-ui-redesign` |
-| Phase 5: Testing & Polish | Not Started | 0% | `feature/phase-5-testing-polish` |
+| Phase 5: Testing & Polish | Completed | 100% | `feature/phase-5-testing-polish` |
 
 ---
 
@@ -44,9 +44,9 @@ This document tracks the progress of the Sorted app enhancement plan.
 - [x] 1.3.5 Create changelog file
 
 #### Sub-Phase 1.4: Visual Verification
-- [ ] 1.4.1 Take screenshots of current app state
+- [x] 1.4.1 Take screenshots of current app state
 - [x] 1.4.2 Document current UX issues
-- [ ] 1.4.3 Visual test: verify search works
+- [x] 1.4.3 Visual test: verify search works
 
 ### Files Created
 - `.github/ISSUE_TEMPLATE/bug_report.md`
@@ -98,13 +98,13 @@ This document tracks the progress of the Sorted app enhancement plan.
 - [x] 2.3.2 Update normalizer with relevance data
 - [x] 2.3.3 Add relevanceScore to ComparisonRestaurant type
 - [x] 2.3.4 Update search API to sort by relevance
-- [ ] 2.3.5 Write integration tests
+- [x] 2.3.5 Write integration tests
 
 #### Sub-Phase 2.4: Testing & Verification
-- [ ] 2.4.1 Create test cases for cuisine searches
-- [ ] 2.4.2 Test: "Chinese" returns Chinese first
-- [ ] 2.4.3 Test: "Biryani" returns biryani places first
-- [ ] 2.4.4 Visual test: verify relevance in browser
+- [x] 2.4.1 Create test cases for cuisine searches
+- [x] 2.4.2 Test: "Chinese" returns Chinese first
+- [x] 2.4.3 Test: "Biryani" returns biryani places first
+- [x] 2.4.4 Visual test: verify relevance in browser
 - [x] 2.4.5 Document algorithm in docs
 
 ### Files Created/Modified
@@ -132,9 +132,9 @@ This document tracks the progress of the Sorted app enhancement plan.
 
 ## Phase 3: Filters & Sorting
 
-**Status**: In Progress
+**Status**: Completed
 **Branch**: `feature/phase-3-filters-sorting`
-**Merged to**: -
+**Merged to**: `develop`
 
 ### Completed Tasks
 
@@ -146,7 +146,7 @@ This document tracks the progress of the Sorted app enhancement plan.
 - [x] 3.1.5 Create rating filter (4+, 3.5+, 3+)
 - [x] 3.1.6 Create delivery time filter (<30min, <45min)
 - [x] 3.1.7 Create "available on both" filter (platform filter)
-- [ ] 3.1.8 Write unit tests for each filter
+- [x] 3.1.8 Write unit tests for each filter
 
 #### Sub-Phase 3.2: Sorting Options
 - [x] 3.2.1 Define sort options interface
@@ -155,14 +155,14 @@ This document tracks the progress of the Sorted app enhancement plan.
 - [x] 3.2.4 Implement rating sort (high to low)
 - [x] 3.2.5 Implement delivery time sort (fast first)
 - [x] 3.2.6 Implement savings sort (biggest savings first)
-- [ ] 3.2.7 Write unit tests for sorting
+- [x] 3.2.7 Write unit tests for sorting
 
 #### Sub-Phase 3.3: Filter/Sort Engine
 - [x] 3.3.1 Create filter engine (applies all filters)
 - [x] 3.3.2 Create sort engine (applies selected sort)
 - [x] 3.3.3 Combine into unified search processor
 - [x] 3.3.4 Update search API with filter/sort params
-- [ ] 3.3.5 Write integration tests
+- [x] 3.3.5 Write integration tests
 
 #### Sub-Phase 3.4: Filter UI Components
 - [x] 3.4.1 Create FilterBar container component
@@ -178,9 +178,9 @@ This document tracks the progress of the Sorted app enhancement plan.
 #### Sub-Phase 3.5: Integration & Testing
 - [x] 3.5.1 Integrate FilterBar into search page
 - [x] 3.5.2 Add URL query param sync for filters
-- [ ] 3.5.3 Visual test: all filters work
-- [ ] 3.5.4 Visual test: sorting changes order
-- [ ] 3.5.5 Document filters in docs
+- [x] 3.5.3 Visual test: all filters work
+- [x] 3.5.4 Visual test: sorting changes order
+- [x] 3.5.5 Document filters in docs
 
 ### Files Created/Modified
 - `src/lib/filters/types.ts` - New (filter type definitions)
@@ -310,13 +310,128 @@ This document tracks the progress of the Sorted app enhancement plan.
 
 ---
 
-## Phase 5: Testing, Performance & Polish
+## Phase 5: Testing & Polish
 
-**Status**: Not Started
+**Status**: Completed
 **Branch**: `feature/phase-5-testing-polish`
+**Merged to**: -
 
-### Pending Tasks
-(See full plan in main PLAN document)
+### Completed Tasks
+
+#### Sub-Phase 5.1: Test Infrastructure Setup
+- [x] 5.1.1 Install Vitest and related dependencies
+- [x] 5.1.2 Configure vitest.config.ts
+- [x] 5.1.3 Add test scripts to package.json
+- [x] 5.1.4 Create test helper utilities (src/test/helpers.ts)
+- [x] 5.1.5 Create test setup file (src/test/setup.ts)
+
+#### Sub-Phase 5.2: Unit Tests - Search & Relevance
+- [x] 5.2.1 Enable relevance.test.ts (22 tests)
+- [x] 5.2.2 Enable keywords.test.ts (21 tests)
+- [x] 5.2.3 Add cuisines.test.ts (23 tests)
+
+#### Sub-Phase 5.3: Unit Tests - Filters
+- [x] 5.3.1 Add cuisine.test.ts (9 tests)
+- [x] 5.3.2 Add dietary.test.ts (5 tests)
+- [x] 5.3.3 Add price.test.ts (14 tests)
+- [x] 5.3.4 Add rating.test.ts (11 tests)
+- [x] 5.3.5 Add delivery.test.ts (13 tests)
+- [x] 5.3.6 Add platform.test.ts (12 tests)
+- [x] 5.3.7 Add engine.test.ts (19 tests)
+
+#### Sub-Phase 5.4: Unit Tests - Sorting
+- [x] 5.4.1 Add sorter.test.ts (17 tests)
+
+#### Sub-Phase 5.5: Unit Tests - Matching & Comparison
+- [x] 5.5.1 Add matcher.test.ts (19 tests)
+- [x] 5.5.2 Add normalizer.test.ts (25 tests)
+
+#### Sub-Phase 5.6: Unit Tests - UI Components
+- [x] 5.6.1 Add SavingsBadge.test.ts (10 tests)
+- [x] 5.6.2 Add useMediaQuery.test.ts (8 tests)
+
+#### Sub-Phase 5.7: Visual Tests with agent-browser
+- [x] 5.7.1 Create visual-tests.js script
+- [x] 5.7.2 Add screenshots directory
+- [x] 5.7.3 Implement testSearchFlow
+- [x] 5.7.4 Implement testFiltersWork
+- [x] 5.7.5 Implement testMobileResponsiveness
+- [x] 5.7.6 Implement testEmptyState
+- [x] 5.7.7 Implement testLoadingStates
+- [x] 5.7.8 Implement testSortingChangesOrder
+
+### Files Created
+- `vitest.config.ts` - Vitest configuration
+- `src/test/setup.ts` - Test setup with mocks
+- `src/test/helpers.ts` - Mock factory functions
+- `src/lib/search/__tests__/cuisines.test.ts` - Cuisine taxonomy tests
+- `src/lib/filters/__tests__/cuisine.test.ts` - Cuisine filter tests
+- `src/lib/filters/__tests__/dietary.test.ts` - Dietary filter tests
+- `src/lib/filters/__tests__/price.test.ts` - Price filter tests
+- `src/lib/filters/__tests__/rating.test.ts` - Rating filter tests
+- `src/lib/filters/__tests__/delivery.test.ts` - Delivery time filter tests
+- `src/lib/filters/__tests__/platform.test.ts` - Platform filter tests
+- `src/lib/filters/__tests__/engine.test.ts` - Filter engine tests
+- `src/lib/sorting/__tests__/sorter.test.ts` - Sorting algorithm tests
+- `src/lib/comparison/__tests__/matcher.test.ts` - Restaurant matching tests
+- `src/lib/comparison/__tests__/normalizer.test.ts` - Normalizer tests
+- `src/components/__tests__/SavingsBadge.test.ts` - Savings calculation tests
+- `src/hooks/__tests__/useMediaQuery.test.ts` - Media query hook tests
+- `scripts/visual-tests.js` - Visual test runner (agent-browser)
+- `scripts/visual-tests-puppeteer.js` - Visual test runner (Puppeteer)
+- `scripts/screenshots/` - Screenshots directory (16 screenshots)
+- `scripts/screenshots/VISUAL_TEST_REPORT.md` - Visual test report
+
+### Files Modified
+- `package.json` - Added test scripts and dependencies
+- `src/lib/search/__tests__/relevance.test.ts` - Enabled tests
+- `src/lib/search/__tests__/keywords.test.ts` - Enabled tests
+
+### Test Summary
+- **Total Unit Tests**: 228 passing
+- **Test Files**: 15
+- **Coverage Areas**: Search, Filters, Sorting, Matching, Components, Hooks
+- **Visual Tests**: 12 passing (16 screenshots)
+- **Visual Test Screenshots**: `scripts/screenshots/`
+
+### Running Tests
+```bash
+# Unit tests (watch mode)
+npm test
+
+# Unit tests (single run)
+npm run test:run
+
+# Unit tests with coverage
+npm run test:coverage
+
+# Visual tests (requires dev server running)
+npm run dev &
+node scripts/visual-tests-puppeteer.js
+
+# Visual tests (alternative, requires agent-browser)
+npm run test:visual
+```
+
+### Visual Test Screenshots
+| Screenshot | Description |
+|------------|-------------|
+| 01-initial-state-desktop.png | Empty search page with popular searches |
+| 02-search-biryani-results.png | Biryani search loading/results |
+| 03-search-chinese-results.png | Chinese search loading/results |
+| 04-search-pizza-results.png | Pizza search loading/results |
+| 05-filters-visible.png | Filter bar visible |
+| 06-sorting-default.png | Default sorting |
+| 06b-sorted-price-low.png | Price low to high sort |
+| 06c-sorted-rating.png | Rating high to low sort |
+| 07-mobile-view.png | Mobile responsive layout |
+| 07b-tablet-view.png | Tablet responsive layout |
+| 08-loading-state.png | Loading skeleton state |
+| 08b-loaded-state.png | Loaded results state |
+| 09-no-results.png | No results/empty state |
+| 10-savings-sorted.png | Biggest savings sort |
+| 11-platform-both.png | Platform filter applied |
+| 12-full-page-scroll.png | Full page with all results |
 
 ---
 
@@ -334,12 +449,14 @@ This document tracks the progress of the Sorted app enhancement plan.
 
 ## Notes
 
-- Phase 2 test files are prepared but commented out - will be enabled in Phase 5
-- Phase 3 implementation is functional, pending visual testing and unit tests
+- Phase 2 test files have been enabled and are passing
+- Phase 3 filter and sorting unit tests are now complete
 - Phase 4 UI/UX improvements address issues #4-8 from UX_ISSUES.md
-- Visual verification tasks require running the app locally
+- Visual verification tests can be run with `npm run test:visual` or `node scripts/visual-tests-puppeteer.js`
 - All merges to develop use `--no-ff` for clear history
+- **16 visual test screenshots** generated in `scripts/screenshots/`
+- Visual test report available at `scripts/screenshots/VISUAL_TEST_REPORT.md`
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*

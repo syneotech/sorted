@@ -30,8 +30,30 @@ export function getZomatoDeepLink(slug: string, city: string = 'bangalore'): str
   return `${ZOMATO_BASE_URL}/${city}/${slug}`;
 }
 
+// Browser singleton for connection reuse
+let browserInstance: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+let browserLastUsed = 0;
+const BROWSER_IDLE_TIMEOUT = 60000; // Close browser after 60s of inactivity
+
 async function getBrowser() {
-  const browser = await puppeteer.launch({
+  const now = Date.now();
+
+  // Reuse existing browser if still valid
+  if (browserInstance) {
+    try {
+      // Check if browser is still connected
+      if (browserInstance.connected) {
+        browserLastUsed = now;
+        return browserInstance;
+      }
+    } catch {
+      // Browser disconnected, will create new one
+      browserInstance = null;
+    }
+  }
+
+  // Launch new browser
+  browserInstance = await puppeteer.launch({
     headless: true,
     args: [
       '--no-sandbox',
@@ -39,10 +61,30 @@ async function getBrowser() {
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--mute-audio',
+      '--no-first-run',
       '--window-size=1920,1080',
     ],
   });
-  return browser;
+  browserLastUsed = now;
+
+  // Set up idle timeout to close browser
+  const checkIdle = () => {
+    if (browserInstance && Date.now() - browserLastUsed > BROWSER_IDLE_TIMEOUT) {
+      browserInstance.close().catch(() => {});
+      browserInstance = null;
+    } else if (browserInstance) {
+      setTimeout(checkIdle, 10000);
+    }
+  };
+  setTimeout(checkIdle, BROWSER_IDLE_TIMEOUT);
+
+  return browserInstance;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,12 +226,22 @@ export async function searchZomatoRestaurants(
     console.log(`Zomato: Navigating to ${searchUrl}`);
 
     await page.goto(searchUrl, {
-      waitUntil: 'networkidle2',
-      timeout: 30000,
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
     });
 
-    // Wait for content to load
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    // Wait for restaurant data to be available (script tag or DOM elements)
+    await Promise.race([
+      page.waitForFunction(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        () => !!(window as any).__PRELOADED_STATE__,
+        { timeout: 5000 }
+      ).catch(() => null),
+      page.waitForSelector('[data-testid="restaurant-card"], a[href*="/order"]', {
+        timeout: 5000,
+      }).catch(() => null),
+      new Promise((resolve) => setTimeout(resolve, 2000)), // Reduced fallback timeout
+    ]);
 
     // Extract __PRELOADED_STATE__ from the page
     const result = await page.evaluate(() => {
@@ -265,7 +317,7 @@ export async function searchZomatoRestaurants(
       // Fallback: Try to scrape restaurant cards directly from DOM
       console.log('Zomato: Attempting DOM scraping fallback...');
 
-      const domRestaurants = await page.evaluate((cityName) => {
+      const domRestaurants = await page.evaluate((_cityName) => {
         const results: Array<{
           name: string;
           rating: string;
@@ -323,7 +375,7 @@ export async function searchZomatoRestaurants(
         return results;
       }, city);
 
-      await browser.close();
+      await page.close();
 
       if (domRestaurants.length > 0) {
         console.log(`Zomato: Found ${domRestaurants.length} restaurants via DOM scraping`);
@@ -350,7 +402,7 @@ export async function searchZomatoRestaurants(
       return [];
     }
 
-    await browser.close();
+    await page.close();
 
     const restaurants = extractRestaurantsFromState(result.data, city);
     console.log(`Zomato: Found ${restaurants.length} restaurants from preloaded state`);
@@ -358,7 +410,14 @@ export async function searchZomatoRestaurants(
     return restaurants;
   } catch (error) {
     console.error('Zomato scraping error:', error);
-    await browser.close();
+    // Close only the page, not the browser (for reuse)
+    try {
+      const pages = await browser.pages();
+      const latestPage = pages[pages.length - 1];
+      if (latestPage) await latestPage.close();
+    } catch {
+      // Ignore cleanup errors
+    }
     throw error;
   }
 }
@@ -380,12 +439,22 @@ export async function getZomatoMenu(
     console.log(`Zomato: Navigating to ${menuUrl}`);
 
     await page.goto(menuUrl, {
-      waitUntil: 'networkidle2',
-      timeout: 30000,
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
     });
 
-    // Wait for menu to load
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    // Wait for menu data to be available
+    await Promise.race([
+      page.waitForFunction(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        () => !!(window as any).__PRELOADED_STATE__,
+        { timeout: 5000 }
+      ).catch(() => null),
+      page.waitForSelector('[class*="MenuSection"], [class*="menu-section"]', {
+        timeout: 5000,
+      }).catch(() => null),
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]);
 
     // Try to extract menu from preloaded state or DOM
     const menuItems = await page.evaluate(() => {
@@ -470,7 +539,7 @@ export async function getZomatoMenu(
       return items;
     });
 
-    await browser.close();
+    await page.close();
 
     console.log(`Zomato: Found ${menuItems.length} menu items`);
 
@@ -485,7 +554,13 @@ export async function getZomatoMenu(
     }));
   } catch (error) {
     console.error('Zomato menu scraping error:', error);
-    await browser.close();
+    try {
+      const pages = await browser.pages();
+      const latestPage = pages[pages.length - 1];
+      if (latestPage) await latestPage.close();
+    } catch {
+      // Ignore cleanup errors
+    }
     throw error;
   }
 }
